@@ -1,0 +1,31 @@
+# permissions for end users to edit monitoringtests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: monitoringtest-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: k8s-operator-monitoring
+    app.kubernetes.io/part-of: k8s-operator-monitoring
+    app.kubernetes.io/managed-by: kustomize
+  name: monitoringtest-editor-role
+rules:
+- apiGroups:
+  - monitoring.motnitoring-test.com
+  resources:
+  - monitoringtests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.motnitoring-test.com
+  resources:
+  - monitoringtests/status
+  verbs:
+  - get
