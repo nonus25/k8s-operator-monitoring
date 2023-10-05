@@ -409,3 +409,9 @@ service/k8s-operator-monitoring-controller-manager-metrics-service unchanged
 deployment.apps/k8s-operator-monitoring-controller-manager unchanged
 servicemonitor.monitoring.coreos.com/k8s-operator-monitoring-controller-manager-metrics-monitor created
 ```
+
+```shell
+❯ k get servicemonitors.monitoring.coreos.com
+NAME                                                         AGE
+k8s-operator-monitoring-controller-manager-metrics-monitor   5m54s
+```
