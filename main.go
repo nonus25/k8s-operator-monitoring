@@ -22,6 +22,7 @@ import (
 	//+kubebuilder:scaffold:imports
 
 	// to ensure that exec-entrypoint and run can make use of them.
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -32,6 +33,7 @@ import (
 
 	cachev1alpha1 "github.com/nonus25/monitor-operator/api/v1alpha1"
 	"github.com/nonus25/monitor-operator/controllers"
+	"github.com/nonus25/monitor-operator/monitoring"
 )
 
 var (
@@ -43,6 +45,9 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(cachev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+
+	monitoring.RegisterMetrics()
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -63,7 +68,9 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	cfg := ctrl.GetConfigOrDie()
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,

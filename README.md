@@ -296,6 +296,7 @@ USER 65532:65532
 
 ENTRYPOINT ["/monitor"]
 ```
+
 then repeat same process for generating the image:
 
 ```shell
@@ -313,7 +314,6 @@ export MONITOR_IMAGE="$user/monitor-operator:v0.0.2"
 
 and then start again `make run`
 
-
 ```shell
 ❯ vim test/sample/manifest/monitor-sample.yaml
 ❯ kubectl apply -f test/sample/manifest/monitor-sample.yaml
@@ -321,7 +321,7 @@ Alias tip: kaf test/sample/manifest/monitor-sample.yaml
 monitor.cache.monitor.com/monitor-sample created
 ```
 
-and we should see this kind of output 
+and we should see this kind of output
 
 ```shell
 NAME                                                          READY   STATUS    RESTARTS        AGE
@@ -329,4 +329,83 @@ k8s-operator-monitoring-controller-manager-75485bc78c-bzh4m   2/2     Running   
 monitor-sample-5d9786b9fd-rfd8j                               1/1     Running   7 (6m24s ago)   26m
 monitor-sample-5d9786b9fd-xxdxz                               1/1     Running   7 (6m20s ago)   26m
 monitor-sample-5d9786b9fd-4gltt                               1/1     Running   7 (6m2s ago)    26m
+```
+
+## Metrics
+
+By default, controller-runtime builds a global prometheus registry and publishes a collection of performance metrics for each controller. [default merics](https://book.kubebuilder.io/reference/metrics-reference)
+
+Make sure cluster role for monitoring been installed `<namePrefix>-metrics-reader`, `namePrefix` we can find in `config/default/kustomization.yaml`
+
+```shell
+❯ k get clusterrole | grep metrics-reader
+system:aggregated-metrics-reader                                       2023-07-05T07:07:33Z
+k8s-operator-monitoring-metrics-reader                                 2023-10-03T09:33:55Z
+```
+
+we can see role is installed `k8s-operator-monitoring-metrics-reader`
+
+### Exporting Metrics for Prometheus
+
+1. Install Prometheus and Prometheus Operator
+2. Uncomment the line `- ../prometheus` in the `config/default/kustomization.yaml`. It creates the `ServiceMonitor` resource which enables exporting the metrics.
+
+To add needed CRD's for metrics we need to install Prometheus
+
+```shell
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus-operator prometheus-community/prometheus-operator
+```
+
+Or we can try to install `bundle.yaml` from `https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml`
+
+```shell
+❯ kaf https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
+customresourcedefinition.apiextensions.k8s.io/alertmanagerconfigs.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/alertmanagers.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/podmonitors.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/probes.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/prometheusrules.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/scrapeconfigs.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/servicemonitors.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/thanosrulers.monitoring.coreos.com created
+clusterrolebinding.rbac.authorization.k8s.io/prometheus-operator unchanged
+clusterrole.rbac.authorization.k8s.io/prometheus-operator unchanged
+deployment.apps/prometheus-operator unchanged
+serviceaccount/prometheus-operator unchanged
+service/prometheus-operator unchanged
+Error from server (Invalid): error when creating "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml": CustomResourceDefinition.apiextensions.k8s.io "prometheusagents.monitoring.coreos.com" is invalid: metadata.annotations: Too long: must have at most 262144 bytes
+Error from server (Invalid): error when creating "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml": CustomResourceDefinition.apiextensions.k8s.io "prometheuses.monitoring.coreos.com" is invalid: metadata.annotations: Too long: must have at most 262144 bytes
+```
+
+Not sure about those errors yet
+
+```shell
+Error from server (Invalid): error when creating "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml": CustomResourceDefinition.apiextensions.k8s.io "prometheusagents.monitoring.coreos.com" is invalid: metadata.annotations: Too long: must have at most 262144 bytes
+Error from server (Invalid): error when creating "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml": CustomResourceDefinition.apiextensions.k8s.io "prometheuses.monitoring.coreos.com" is invalid: metadata.annotations: Too long: must have at most 262144 bytes
+```
+
+and then this works
+
+```shell
+❯ make deploy IMG=docker.io/nonus25/monitor-operator:v0.0.4
+test -s /home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin/controller-gen && /home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin/controller-gen --version | grep -q v0.11.1 || \
+GOBIN=/home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.11.1
+/home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+test -s /home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin/kustomize || { curl -Ss "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 3.8.7 /home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin; }
+cd config/manager && /home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin/kustomize edit set image controller=docker.io/nonus25/monitor-operator:v0.0.4
+/home/auc/go/src/github.com/nonus25/k8s-operator-monitoring/bin/kustomize build config/default | kubectl apply -f -
+namespace/monitor unchanged
+customresourcedefinition.apiextensions.k8s.io/monitors.cache.monitor.com unchanged
+serviceaccount/k8s-operator-monitoring-controller-manager unchanged
+role.rbac.authorization.k8s.io/k8s-operator-monitoring-leader-election-role unchanged
+clusterrole.rbac.authorization.k8s.io/k8s-operator-monitoring-manager-role configured
+clusterrole.rbac.authorization.k8s.io/k8s-operator-monitoring-metrics-reader unchanged
+clusterrole.rbac.authorization.k8s.io/k8s-operator-monitoring-proxy-role unchanged
+rolebinding.rbac.authorization.k8s.io/k8s-operator-monitoring-leader-election-rolebinding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/k8s-operator-monitoring-manager-rolebinding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/k8s-operator-monitoring-proxy-rolebinding unchanged
+service/k8s-operator-monitoring-controller-manager-metrics-service unchanged
+deployment.apps/k8s-operator-monitoring-controller-manager unchanged
+servicemonitor.monitoring.coreos.com/k8s-operator-monitoring-controller-manager-metrics-monitor created
 ```
